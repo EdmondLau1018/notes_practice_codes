@@ -34,11 +34,56 @@ Stream 使用一种类似用 SQL 语句从数据库查询数据的直观方式�
 
 串行流并行流的区别是：串行流从集合中取数据是按照集合的顺序的；而并行流是并行操作的，获取到的数据是无序的
 
+```java
+// 创建一个集合，并添加几个元素  
+List<String> stringList = new ArrayList<>();  
+stringList.add("hello");  
+stringList.add("world");  
+stringList.add("java");  
+​  
+// 通过集合获取串行 stream 对象  
+Stream<String> stream = stringList.stream();  
+// 通过集合获取并行 stream 对象  
+Stream<String> personStream = stringList.parallelStream();
+```
+
 ### 数组创建 Stream
 
+通过` Arrays.stream()` 创建流
 
+```java
+import java.util.Arrays;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+
+public class StreamDemo1 {
+
+    public static void main(String[] args) {
+        // 初始化一个整型数组
+        int[] arr = new int[]{1,2,3};
+        // 通过整型数组，获取整形的 stream 对象
+        IntStream stream1 = Arrays.stream(arr);
+
+        // 通过字符串类型的数组，获取泛型类型为 String 的 stream 对象
+        String[] stringArr = new String[]{"Hello", "imooc"};
+        Stream<String> stream2 = Arrays.stream(stringArr);
+    }
+}
+```
 
 ### Stream.of() 方法
+
+```java
+import java.util.stream.Stream;
+
+public class StreamDemo1 {
+
+    public static void main(String[] args) {
+        // 通过 Stream 类下的 of() 方法，创建 stream 对象、
+        Stream<Integer> stream = Stream.of(1, 2, 3);
+    }
+}
+```
 
 ## 中间操作
 
