@@ -341,9 +341,131 @@ END;
 
 通过这种方式，可以在对象间复制属性时保留目标对象中已有的非空值，即使源对象在相应的属性上有 `null` 值。这对于处理只想更新部分属性或在某些属性未设置时保留旧值的场景非常有用。
 
+# 7、存储过程中游标的使用
+
+> 流程基本语法
+
+```sql
+    -- 声明结束标志变量
+    DECLARE done INT DEFAULT FALSE;
+    DECLARE 游标名称 cursor for  查询语句
+    # 设置游标结束标志
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+    
+    ...
+    
+    	-- 打开游标
+        OPEN 游标名称;
+        -- 循环遍历游标中的所有行
+        read_loop:
+        LOOP
+        	-- 从游标抓取下一行数据给对应变量赋值
+            FETCH batchCursor INTO iv_sampleCode, iv_samplingCode, iv_laborCode;
+            -- 没有更多的数据 （done） 被设置为true
+            IF done THEN
+                LEAVE read_loop; -- 跳出循环
+            END IF;
+			...
+          	-- 业务代码 || 业务操作
+			...
+        END LOOP;
+```
+
+**注意事项：**
+
+* 定义游标的时候一定要在 DECLARE 区域进行定义
+* 循环是通过 `FETCH` 语句在没有更多数据可读时触发设置的处理器来结束的。处理器将 `done` 变量设置为 `TRUE`，然后在循环体内部检查该变量以决定是否继续执行循环。这种方法确保了只要游标中还有数据未被处理，循环就会继续执行；一旦数据被处理完毕，循环就会结束。
+* 刚开始需要手动声明游标结束的变量
+
+* 在存储过程中 如果游标声明的条件变量是在当前存储过程中的业务区域赋值的，不用在意顺序问题
+
+**案例：**
+
+```sql
+create
+    definer = root@`%` procedure delete_ccyBatchInfo_byBatch(IN i_jsonString varchar(4000), IN i_opCode varchar(100),
+                                                             OUT o_resInfo varchar(1000), OUT o_resCode varchar(100),
+                                                             OUT o_resMsg varchar(8000))
+Main1:
+BEGIN
+    DECLARE iv_jsonString varchar(4000);
+    DECLARE iv_resCode_lab VARCHAR(100); # 内部调用的存储过程返回值
+    DECLARE iv_resMsg_lab text; # 内部调用的存储过程返回信息
+    DECLARE iv_resInfo_lab VARCHAR(4000);# 内部调用的存储过程返回数据
+    DECLARE iv_is_exception INT(10); # 手动异常退出标识符
+    DECLARE iv_exception VARCHAR(4000);# 出现异常的自定义异常信息
+    DECLARE iv_jsonParam json;
+
+    -- 声明结束标志变量
+    DECLARE done INT DEFAULT FALSE;
+
+    -- 业务变量
+    DECLARE iv_batchNo VARCHAR(100);
+    DECLARE iv_relaBatchNo VARCHAR(100);
+    DECLARE iv_sampleCode VARCHAR(100);
+    DECLARE iv_samplingCode VARCHAR(100);
+    DECLARE iv_laborCode VARCHAR(100);
+    DECLARE batchCursor cursor for select b.SAMPLE_CODE, b.SAMPLING_CODE, b.LABOR_CODE
+                                   from batch_no_info b
+                                            inner join lab_report l on b.LABOR_CODE = l.LABOR_CODE
+                                   where b.BATCH_RELA_ID = iv_batchNo;
+
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
 
 
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION # 定义OuterLayer最外层异常，接收到异常或者内部上抛的异常，直接跑到调用方，不再做任何事务处理
+    # 定义捕获异常具体操作
+        BEGIN
+            -- 这两句是一个完整的操作，切记：是将错误代码和信息赋给变量
+            GET DIAGNOSTICS CONDITION 1 iv_resCode_lab = RETURNED_SQLSTATE, iv_resMsg_lab = MESSAGE_TEXT;
+            # 将错误信息代码及信息捕获
+            ## 完善异常信息
+            SET iv_resMsg_lab = CONCAT('Main1-->', iv_resMsg_lab); ## 捕获到异常，完善一下异常信息，调用方好获取具体问题所在位置
+            RESIGNAL SET MESSAGE_TEXT = iv_resMsg_lab;
+        END;
 
+    set iv_resMsg_lab = '';
+    -- 将传入的varchar 转换为json
+    SET iv_jsonString = CAST(i_jsonString AS json);
+
+    SET o_resCode = '0';
+    SET o_resMsg = 'ok';
+    SET o_resInfo = '删除存查样信息成功';
+
+    -- 获取jsonString参数中的对应的json数据赋值到变量；
+    set iv_jsonParam = iv_jsonString;
+    set iv_batchNo = iv_jsonParam ->> '$.batchNo';
+
+    IF LEFT(iv_batchNo, 2) = 'QC' then
+        -- 打开游标
+        OPEN batchCursor;
+        -- 循环遍历游标中的所有行
+        read_loop:
+        LOOP
+            FETCH batchCursor INTO iv_sampleCode, iv_samplingCode, iv_laborCode;
+            IF done THEN
+                LEAVE read_loop;
+            END IF;
+
+            select count(1) into @cnt from lab_report where LABOR_CODE = iv_laborCode;
+            if @cnt > 0 then
+                delete from lab_report where LABOR_CODE = iv_laborCode;
+            end if;
+
+        END LOOP;
+
+        -- 关闭游标
+        CLOSE batchCursor;
+    elseif LEFT(iv_batchNo, 3) = 'CCY' then
+        select LABOR_CODE into iv_laborCode from batch_no_info where BATCH_NO = iv_batchNo;
+        select count(1) into @cnt from lab_report where LABOR_CODE = iv_laborCode;
+        if @cnt > 0 then
+            delete from lab_report where LABOR_CODE = iv_laborCode;
+        end if;
+        delete from batch_no_info where BATCH_NO = iv_batchNo;
+    end if;
+end;
+```
 
 # 99、 结语
 
