@@ -178,35 +178,13 @@ registry = "https://registry.npmmirror.com/"
 
 ## 0-3 数据库
 
-
-
-
-
-
-
-
-
-
-
-
-
 # 1、使用 easyExcel 进行数据导入
-
-
 
 # 1.3、现场代码部署-同步依赖
 
-​	
-
-
-
 # 2、Java8 stream：根据特定字段将单个 List 拆分为多个
 
-
-
 # 3、mysql 查询 union 用法
-
-
 
 ## 3.1、MYSQL 函数封装 生成采制化编码
 
@@ -246,23 +224,9 @@ BEGIN
 END;
 ```
 
-
-
 # 4、存储过程从 json 对象中获取属性
 
-
-
-
-
 # 5、 Antd 表格设置
-
-
-
-
-
-
-
-
 
 # 6、对象拷贝工具方法
 
@@ -467,9 +431,48 @@ BEGIN
 end;
 ```
 
+# 8、使用反射写一个工具方法
+
+遍历一个列表，检查属性名称中含有 Date Name No 的字段 如果属性值是  null 则将属性值赋值为 0
+
+```java
+    public static void processEntities(List<InOutEntity> inOutEntityList) {
+        for (InOutEntity entity : inOutEntityList) {
+            //	获取实体类中的所有字段并返回一个数组
+            Field[] fields = InOutEntity.class.getDeclaredFields();
+            for (Field field : fields) {
+                try {
+                    // 使私有字段也可以被访问
+                    field.setAccessible(true);
+                    // 检查字段值是否为null，且字段名不包含特定字符串  
+                    if (field.get(entity) == null && !field.getName().matches(".*(Date|Name|No).*")) {
+                        // 将null值的字段设置为"0"
+                        field.set(entity, "0");
+                    }
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+```
+
+1. getDeclaredFields() 是 Java 反射中的一个方法 这个方法可以获取一个类中声明的所有字段，包括公共（public）、保护（protected）、默认（package）访问和私有（private）字段，但不包括继承的字段。当你对一个 `Class` 类型的对象调用 `getDeclaredFields()` 方法时，它会返回一个 `Field` 类型的数组，其中包含了类中所有声明的字段。
+2. Field 类型的对象通过 `get(这个类的对象)` 这种形式获取属性值 ，通过 `getName()` 方法获取属性名。
+3. `getDeclaredFields()` 方法提供了对类的内部信息的访问，因此使用它时需要处理安全和权限问题。默认情况下，你可能无法访问私有字段，除非通过 `setAccessible(true)` 方法来覆盖访问控制。
+4. 它允许程序在运行时检查和修改对象的内部状态，这在某些高级编程场景中非常有用，如序列化、对象映射、动态代理等。然而，由于它破坏了封装原则，可能导致代码难以理解和维护，因此建议谨慎使用。
+
+# 98、问题思考
+
+如果有的情况需要在前端隐藏记录的主键 如何操作？常用的前端隐藏主键的解决方案？
+
+
+
 # 99、 结语
 
 <img src="./000NEPT 打工日志.assets/52508eb0e6132700881aca12b362aa3.jpg" alt="52508eb0e6132700881aca12b362aa3" style="zoom:50%;" />
+
+
 
 
 
