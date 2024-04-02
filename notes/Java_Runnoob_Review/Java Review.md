@@ -1,5 +1,112 @@
 # Java Review
 
+# 反射
+
+Java 的反射（reflection）机制是指在程序的**运行状态中**，可以构造任意一个类的对象，可以了解任意一个对象所属的类，可以了解任意一个类的成员变量和方法，可以调用任意一个对象的属性和方法。这种**动态获取程序信息以及动态调用对象**的功能称为 Java 语言的反射机制。反射被视为动态语言的关键。
+
+![img](Java%20Review.assets/5ed066e809e20c1022080670.jpg)
+
+**程序的运行时刻：** JVM在运行 class 文件的时候
+
+**反射的功能：** 在程序运行期间动态获取 类中的属性和方法，从而动态的完成 对象实例化 ，属性赋值，调用方法等操作
+
+ ## 反射常用类
+
+| 类名            | 作用                                                       |
+| --------------- | ---------------------------------------------------------- |
+| **Class**       | `Class` 类的实例表示正在运行的 `Java` 应用程序中的类和接口 |
+| **Constructor** | 用于访问单个构造方法信息                                   |
+| **Field**       | 用来访问类或者接口的字段信息                               |
+| **Method**      | 提供类或接口的某个方法信息                                 |
+
+通过  `类名.Class` 的方式获取 这个类的 Class 对象 
+
+> **class** 获取类对象 
+
+可以通过类对象获取字段和方法
+
+```java
+            Class<PkgEntity> pkgEntityClass = PkgEntity.class;
+            System.out.println("通过类对象直接获取字段：" + pkgEntityClass.getDeclaredField("pkgName"));
+            System.out.println("通过类对象获取方法名称：" + pkgEntityClass.getDeclaredMethod("getPkgName"));
+```
+
+同样的 `getClass()`方法也可以在程序运行时获取类的对象
+
+> **Constructor** 构造方法通过反射的方式构造实体类
+
+通过 `getConstructor()` 方法获取这个类的构造函数
+
+```java
+            //  反射 执行构造方法创建一个对象
+            Constructor<PkgEntity> constructor = pkgEntityClass.getConstructor();
+            constructor.setAccessible(true);
+            PkgEntity pkgEntity = constructor.newInstance();
+            pkgEntity.setPkgName("com.example.MyPackage");
+            pkgEntity.setJsonString("{\"key\":\"value\"}");
+            pkgEntity.setOpCode("user123");
+            pkgEntity.setResInfo("Success");
+            pkgEntity.setResCode("200");
+            pkgEntity.setResMsg("Operation completed successfully.");
+            System.out.println("----------------------构造方法创建的对象---------------------");
+            System.out.println(pkgEntity);
+```
+
+> **getDeclaredField **() 返回 **Field** 类的对象修改字段值
+
+通过 class 对象的 `getDeclaredField()` 获取字段 `Field`实例对象 
+
+*  参数：类中的字段名称
+
+```java
+  			 //  通过反射获取字段 并且修改字段的值
+            Field pkgName = pkgEntity.getClass().getDeclaredField("pkgName");
+            pkgName.setAccessible(true);
+            System.out.println("修改前的字段值为：" + pkgName.get(pkgEntity));
+            pkgName.set(pkgEntity,"update_batch");
+            System.out.println("修改后的字段值为：" + pkgEntity.getPkgName());
+```
+
+> **getDeclaredMethod()** 通过反射调用方法 
+
+`getDeclaredMethod()` 获取方法 
+
+* 参数1：方法名称
+* 参数2 -- n ： 方法参数数据类型
+
+```java
+ 			java.lang.String sObject = new java.lang.String("大破鞋");
+            Method replace = sObject.getClass().getDeclaredMethod("replace", char.class, char.class);
+            replace.invoke(sObject,"大","龙背上的");
+            System.out.println(sObject);
+```
+
+## 反射工具方法
+
+入参是一个 列表，这个方法通过获取字段 并比对字段名称的方式 将字段中含有 `Data`  `NO`   `Name`  且属性值为 null 的属性赋值为 0
+
+```java
+    // 将多余的元素设置为 0
+    public static void processEntities(List<InOutEntity> inOutEntityList) {
+        for (InOutEntity entity : inOutEntityList) {
+            Field[] fields = InOutEntity.class.getDeclaredFields();
+            for (Field field : fields) {
+                try {
+                    // 使私有字段也可以被访问
+                    field.setAccessible(true);
+                    // 检查字段值是否为null，且字段名不包含特定字符串
+                    if (field.get(entity) == null && !field.getName().matches(".*(Date|Name|No).*")) {
+                        // 将null值的字段设置为"0"
+                        field.set(entity, "0");
+                    }
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+```
+
 # Stream 
 
 Java 8 API添加了一个新的抽象称为流Stream，可以让你以一种声明的方式处理数据。
@@ -266,6 +373,8 @@ public class Demo2Reduce {
         System.out.println(statistics.getAverage());
         System.out.println(statistics.getSum());
 ```
+
+# JUC 
 
 
 
