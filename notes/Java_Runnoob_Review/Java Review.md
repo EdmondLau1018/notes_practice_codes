@@ -147,7 +147,7 @@ List<String> stringList = new ArrayList<>();
 stringList.add("hello");  
 stringList.add("world");  
 stringList.add("java");  
-​  
+
 // 通过集合获取串行 stream 对象  
 Stream<String> stream = stringList.stream();  
 // 通过集合获取并行 stream 对象  
@@ -375,6 +375,143 @@ public class Demo2Reduce {
 ```
 
 # JUC 
+
+# JUC 包组织结构
+
+| 包路径                      | 组织结构                                                     | 类型                                                         |
+| --------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| java.util.concurrent        | 提供很多种最基本的并发工具类，包括对各类数据结构的并发封装，并发框架主要接口 | CountDownLatch，CyclicBarrier，Semaphore，Exchanger，Phaser，BlockingQueue，ConcurrentHashMap，ThreadPoolExecutor，ForkJoinPool |
+| java.util.concurrent.atomic | 提供各类原子操作工具类                                       | AtomicInteger， DoubleAdder，LongAccumulator，AtomicReference |
+| java.util.concurrent.locks  | 提供各类锁工具                                               | Lock，ReadWriteLock，ReentrantLock，StampedLock              |
+
+# JUC 包内容结构
+
+**锁（locks）部分**：提供适合各类场合的锁工具；
+**原子变量（atomic）部分**：原子变量类相关，是构建非阻塞算法的基础；
+**并发框架（executor）部分**：提供线程池相关类型；
+**并发容器（collections） 部分**：提供一系列并发容器相关类型；
+**同步工具（tools）部分**：提供相对独立，且场景丰富的各类同步工具，如信号量、闭锁、栅栏等功能；
+
+![图片描述](Java%20Review.assets/5f68197e0955bfb210800620.jpg)
+
+# AtomicInteger
+
+> 什么是原子操作？
+
+所谓原子操作，是一个独立的，不可分割的操作
+
+AtomicInteger 工具类就是为了**简化整型变量的同步处理**而诞生的 || 当多线程同时操作一个整型变量的增减时，会出现运算结果错误的问题
+
+## 核心方法
+
+| 方法名称            | 作用                                                         |
+| ------------------- | ------------------------------------------------------------ |
+| **getAndAdd**       | 先获取当前 AtomicInter 中的数值 然后执行加法                 |
+| **getAndIncrement** | 先获取值 ，再对当前值执行自增操作                            |
+| **addAndGet**       | 先对 AtomicInter  中的数值执行 加法，获取执行加法之后的值    |
+| **decrementAndGet** | 先对 AtomicInter   中的值进行自减 ，获取执行减法之后的值     |
+| **compareAndSet**   | 将 AtomicInter  中的值与 expect 进行比较 如果相等 返回true 将 AtomicInter  更新为 update 中的值； 如果不相等 返回 false 不更新 AtomicInter   中的值 |
+
+```java
+  		AtomicInteger atomicInteger = new AtomicInteger();
+        //  获取当前值
+        System.out.println(atomicInteger.get());
+        System.out.println("先获取值再执行加法：" + atomicInteger.getAndAdd(100));
+        System.out.println("先获取值再自增：" + atomicInteger.getAndIncrement());
+
+
+        System.out.println("先执行 add 再获取值：" + atomicInteger.addAndGet(-88));
+        System.out.println("先自减再获取值：" + atomicInteger.decrementAndGet());
+
+        System.out.println("操作之后的值：" + atomicInteger.get());
+```
+
+```java
+    public static void testCompareAndSet(){
+        AtomicInteger handler = new AtomicInteger(30);
+        int expect = 30;
+        int update  = 34;
+        boolean res = handler.compareAndSet(expect, update);
+        System.out.println("这俩值相等？" + res);
+        System.out.println("结果：" + handler.get());
+    }
+```
+
+## 案例
+
+用售票作为案例，不同的售票窗口模拟不同的线程，操作同一份数据（当前余票数）
+
+定义 全局变量 作为 当前余票数 通过开启不同的线程对 当前余票数量自减 
+
+```java
+public class AtomicIntegerDemo {
+
+	//	定义十张票
+    private static AtomicInteger currentTicketCount = new AtomicInteger(10);
+
+    public static void main(String[] args) {
+        //	定义 4 个售票窗口（开启 4 个线程）对总票数进行操作
+        for (int i = 0; i <= 3; i++) {
+            TicketOffice ticketOffice = new TicketOffice(currentTicketCount, i);
+            new Thread(ticketOffice).start();
+        }
+    }
+}
+```
+
+售票窗口业务线程类代码：
+
+```java
+public class TicketOffice implements Runnable {
+
+    private AtomicInteger currentTicketCount;
+
+    private String ticketOfficeNo;
+
+    public TicketOffice(AtomicInteger currentTicketCount, Integer ticketOfficeNo) {
+        this.currentTicketCount = currentTicketCount;
+        this.ticketOfficeNo = "第" + ticketOfficeNo + "号售票窗口";
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            if (currentTicketCount.get() < 1) {
+                System.out.println("售票结束 " + ticketOfficeNo + "结束售票");
+                return;
+            }
+            try {
+                Thread.sleep(new Random().nextInt(1000));
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            //  模拟售票过程
+            int ticketNumber = currentTicketCount.decrementAndGet();
+            if (ticketNumber >= 0) {
+                System.out.println("第" + ticketOfficeNo + "号窗口" + "已出票，还剩：" + ticketNumber + "张票");
+            }
+        }
+    }
+}
+```
+
+# AtomicReference
+
+AtomicReference 工具类直译为 “原子引用”
+
+引用就是为对象另起一个名字，引用对象本身指向被引用对象，对引用对象的操作都会反映到被引用对象上。在 Java 中，引用对象本身存储的是被引用对象的 “索引值”。
+
+![图片描述](Java%20Review.assets/5f6865cf0908c8c305760463-1712111101824-3.jpg)
+
+如图，每个线程操作的都是 内存中真实对象的引用对象，而不是直接操作真实对象
+
+## 核心方法
+
+| 方法名称          | 作用                                                         |
+| ----------------- | ------------------------------------------------------------ |
+| **set**           | 可以使用不带参数的构造方法构造好对象后，再使用 set () 方法设置待封装的对象 |
+| **getAndSet**     | 此方法以原子方式设置为给定值，并返回旧值。逻辑等同于先调用 get () 方法再调用 set () 方法 |
+| **compareAndSet** | AtomicReference 初始化的对象 与 expect 比较 如果是 expect 引用，就将这个引用更新成 update 对象的引用 ，如果不是 返回 false 不更新这个引用 |
 
 
 
