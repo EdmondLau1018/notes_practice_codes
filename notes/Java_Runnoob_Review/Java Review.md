@@ -614,3 +614,114 @@ public class AuctionCustomer implements Runnable{
 如果你通过 `atomicReference` 中的引用对对象进行了修改 （使用 `set()` 或者 `getAndSet()`方法对这个对象属性值进行修改），那么这个修改会影响到原来的对象，因为你是在操作对象本身。但 `compareAndSet` 方法本身不会修改对象的状态，它只是条件性地更新引用。
 
 总结一下，`compareAndSet` 方法影响的是 `AtomicReference` 中存储的引用，而不是引用所指向的对象本身的状态。
+
+# DoubleAdder
+
+DoubleAdder 工具类采用了 “分头计算最后汇总” 的思路，避免每一次（细粒度）操作的并发控制，提高了并发的性能。
+
+所谓细粒度的同步控制，指的是对待同步控制对象的每一次操作都需要加以控制
+
+![图片描述](Java%20Review.assets/5f686e62098ca18608270531-1712123906766-7.jpg)
+
+## 核心方法
+
+| 方法名称         | 作用                                                         |
+| ---------------- | ------------------------------------------------------------ |
+| **add**          | 将累加器中的操作数进行加法运算                               |
+| **sum**          | 返回累加器中的累加和                                         |
+| **reset**        | 将累加器中的数值设置为 0                                     |
+| **sumThenReset** | 此方法逻辑等同于先调用 sum () 方法再调用 reset () 方法，简化代码编写 |
+
+```java
+        DoubleAdder doubleAdder = new DoubleAdder();
+        doubleAdder.add(43.9);
+        doubleAdder.add(56.1);
+        System.out.println(doubleAdder.sum());
+```
+
+## 案例
+
+通过商场检测器模拟 检测用户性别 得出不同性别的累加结果作为案例 
+
+主类
+
+```java
+public class DoubleAdderDemo {
+
+    //  使用静态变量 表示多种不同性别的人群总数
+    private static DoubleAdder maleCount = new DoubleAdder();
+
+    private static DoubleAdder femaleCount = new DoubleAdder();
+
+    private static DoubleAdder walmartBagCount = new DoubleAdder();
+
+    public static void main(String[] args) {
+
+        //  开启 30 个线程 对 性别数量进行监控
+        for (int i = 0; i < 30; i++) {
+            MonitoringDevice monitoringDevice = new MonitoringDevice(maleCount, femaleCount, walmartBagCount, i);
+            new Thread(monitoringDevice).start();
+        }
+    }
+}
+```
+
+检测器类
+
+```java
+public class MonitoringDevice implements Runnable{
+
+    private DoubleAdder maleCount;
+
+    private DoubleAdder femaleCount;
+
+    private DoubleAdder walmartBagCount;
+
+    private String deviceNo;
+
+    public MonitoringDevice(DoubleAdder maleCount, DoubleAdder femaleCount, DoubleAdder walmartBagCount, Integer deviceNo) {
+        this.maleCount = maleCount;
+        this.femaleCount = femaleCount;
+        this.walmartBagCount = walmartBagCount;
+        this.deviceNo = "第 " +  deviceNo + " 台设备";
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            try {
+                Thread.sleep(new Random().nextInt(3000));
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            //  对检测见过进行统计
+            //  模拟检测结果 检测结果取值范围 0 1 2 
+            int monitoringRes = new Random().nextInt(3);
+            switch (monitoringRes) {
+                case 0:
+                    femaleCount.add(1);
+                    System.out.println("统计结果女性数量 ：" + femaleCount.sum());
+                    break;
+                case 1:
+                    maleCount.add(1);
+                    System.out.println("统计结果男性数量 ：" + maleCount.sum());
+                    break;
+                default:
+                    walmartBagCount.add(1);
+                    System.out.println("统计结果沃尔玛购物袋数量：" + walmartBagCount.sum());
+                    break;
+            }
+        }
+    }
+}
+```
+
+# LongAccumulator
+
+相比 LongAdder，LongAccumulator 工具类提供了更灵活更强大的功能。不但可以指定计算结果的初始值，相比 LongAdder 只能对数值进行加减运算，LongAccumulator 还能自定义计算规则，比如做乘法运行，或其他任何你想要的计算规则
+
+![图片描述](Java%20Review.assets/5f687b3c098bf71308310554-1712132862674-11.jpg)
+
+
+
