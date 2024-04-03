@@ -513,5 +513,104 @@ AtomicReference 工具类直译为 “原子引用”
 | **getAndSet**     | 此方法以原子方式设置为给定值，并返回旧值。逻辑等同于先调用 get () 方法再调用 set () 方法 |
 | **compareAndSet** | AtomicReference 初始化的对象 与 expect 比较 如果是 expect 引用，就将这个引用更新成 update 对象的引用 ，如果不是 返回 false 不更新这个引用 |
 
+```java
+        Car car = new Car("HX123","bmw","家用轿车");
+        // 创建第一个对象的引用
+        AtomicReference<Car> reference = new AtomicReference<>(car);
+        //  新建一个对象
+        Car newCar = new Car("AB456", "audi", "商务轿车");
+        //  比较 将 第一个对象的引用 与 第一个对象进行比较
+        reference.compareAndSet(car, newCar);
+        System.out.println(reference.get());
+```
 
+最后输出的结果是 对象的引用被更改成为 newCar 对象
 
+## 案例
+
+通过 模拟抢车牌的业务逻辑 ，每个线程代表一个用户，每个用户有一次抢车牌的机会，我们对车牌对象创建引用，每个用户线程抢车牌的操作 相当于是 新建一个 随机数车牌对象与 原对象进行比较，之后修改这个引用对象为第一个线程新创建的对象，后续的线程在获取这个修改后的引用对象与原对象比较时 返回的值是 false 也就无法对 引用对象进行修改，相当于只有第一个修改引用对象的线程抢到了车牌
+
+车牌实体类
+
+```java
+public class CarLicenseTag {
+
+    private String licenseNo = "沪A 99900";
+
+    private double price = 8000.0;
+
+    public CarLicenseTag(double price) {
+        this.price = price;
+    }
+
+    @Override
+    public String toString() {
+        return "CarLicenseTag{" +
+                "licenseNo='" + licenseNo + '\'' +
+                ", price=" + price +
+                '}';
+    }
+}
+```
+
+主函数
+
+```java
+public class AtomicReferenceDemo {
+
+    //	创建唯一的车牌对象
+    private static CarLicenseTag carLicenseTag =  new CarLicenseTag(8000);
+
+    //	创建引用对象，第一个线程修改的也是这个引用对象的引用地址
+    private static AtomicReference<CarLicenseTag> carLicenseTagAtomicReference = new AtomicReference<>(carLicenseTag);
+
+    public static void main(String[] args) {
+
+        for (int i = 0; i <= 5 ; i++) {
+            AuctionCustomer auctionCustomer = new AuctionCustomer(carLicenseTagAtomicReference, 																carLicenseTag, i);
+
+            new Thread(auctionCustomer).start();
+        }
+    }
+}
+```
+
+用户业务类
+
+```java
+public class AuctionCustomer implements Runnable{
+
+    private AtomicReference<CarLicenseTag> carLicenseTagAtomicReference;
+
+    private CarLicenseTag carLicenseTag;
+
+    private String customerNo;
+
+    public AuctionCustomer(AtomicReference<CarLicenseTag> carLicenseTagAtomicReference, CarLicenseTag carLicenseTag, Integer customerNo) {
+        this.carLicenseTagAtomicReference = carLicenseTagAtomicReference;
+        this.carLicenseTag = carLicenseTag;
+        this.customerNo = "第" +  customerNo + "位客户";
+    }
+
+    @Override
+    public void run() {
+        try {
+            Thread.sleep(new Random().nextInt(4000));
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        //  模拟竞拍过程
+        //	第一个线程将 引用对象修改为 新创建的对象 因为静态的引用对象被修改了 所以 与原对象的对比返回 false
+        boolean result = carLicenseTagAtomicReference.compareAndSet(carLicenseTag,
+                new CarLicenseTag(new Random().nextInt(10000)));
+        System.out.println(customerNo + "竞拍结果：" + result + "当前竞拍信息：" + carLicenseTag);
+    }
+}
+```
+
+**注意：**
+
+如果你通过 `atomicReference` 中的引用对对象进行了修改 （使用 `set()` 或者 `getAndSet()`方法对这个对象属性值进行修改），那么这个修改会影响到原来的对象，因为你是在操作对象本身。但 `compareAndSet` 方法本身不会修改对象的状态，它只是条件性地更新引用。
+
+总结一下，`compareAndSet` 方法影响的是 `AtomicReference` 中存储的引用，而不是引用所指向的对象本身的状态。
